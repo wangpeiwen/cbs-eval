@@ -7,7 +7,7 @@ Usage:
 
 import argparse, json, os, time, glob, gzip
 from itertools import product
-from .config import Experiment, OUTPUT_DIR, V100_BW_GBS, get_model_params
+from .config import Experiment, OUTPUT_DIR, V100_BW_GBS, get_model_params, resolve_model_path
 from .classifier import classify, Cat
 
 
@@ -47,20 +47,22 @@ def main():
     from transformers import AutoTokenizer
     from .runner import make_prompts
 
-    print(f"Loading model: {args.model}...")
-    llm = LLM(model=args.model, dtype="float16", trust_remote_code=True,
+    model_path = resolve_model_path(args.model)
+
+    print(f"Loading model: {model_path}...")
+    llm = LLM(model=model_path, dtype="float16", trust_remote_code=True,
               enforce_eager=True,
               profiler_config={"profiler": "torch", "torch_profiler_dir": args.profile_dir})
-    tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
     print("Model loaded.\n")
 
     llm.generate(["Hello"], SamplingParams(max_tokens=1, temperature=0))
 
-    exp = Experiment(model=args.model)
+    exp = Experiment(model=model_path)
     if args.batch_sizes: exp.batch_sizes = args.batch_sizes
     if args.seq_lengths: exp.seq_lengths = args.seq_lengths
 
-    mp = get_model_params(args.model)
+    mp = get_model_params(model_path)
     print(f"Model params: {mp}")
 
     results = {}

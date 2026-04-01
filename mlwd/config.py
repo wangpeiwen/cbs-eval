@@ -62,6 +62,18 @@ def get_model_params(model_path: str) -> dict:
     raise ValueError(f"Unknown model: {model_path}. Add to MODEL_PARAMS or provide config.json.")
 
 
+# 短名称 → 本地绝对路径映射（离线服务器无外网，必须用本地路径）
+MODEL_PATH_MAP = {
+    "qwen2.5-7b": "/data/Qwen2.5-7B-Instruct",
+    "llama-3.1-8b": "/data/Llama-3.1-8B-Instruct",
+}
+
+
+def resolve_model_path(name_or_path: str) -> str:
+    """将短名称解析为本地绝对路径，已是路径则原样返回。"""
+    return MODEL_PATH_MAP.get(name_or_path, name_or_path)
+
+
 DEFAULT_MODEL = "/data/Qwen2.5-7B-Instruct"
 DEFAULT_BATCH_SIZES = [1, 4]
 DEFAULT_SEQ_LENGTHS = [32, 64, 128]

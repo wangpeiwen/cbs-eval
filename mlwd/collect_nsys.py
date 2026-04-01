@@ -17,7 +17,7 @@ Usage:
 
 import argparse, json, os, time, sqlite3, statistics
 from itertools import product
-from .config import Experiment, OUTPUT_DIR
+from .config import Experiment, OUTPUT_DIR, resolve_model_path
 from .classifier import classify, Cat
 
 
@@ -27,7 +27,7 @@ def _profile_mode(args):
     from .runner import load_model, make_prompts
     from vllm import SamplingParams
 
-    exp = Experiment(model=args.model)
+    exp = Experiment(model=resolve_model_path(args.model))
     if args.batch_sizes: exp.batch_sizes = args.batch_sizes
     if args.seq_lengths: exp.seq_lengths = args.seq_lengths
 

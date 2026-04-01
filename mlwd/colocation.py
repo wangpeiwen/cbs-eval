@@ -26,7 +26,7 @@ import argparse, json, os, time, gc
 from itertools import product
 from pathlib import Path
 
-from .config import Experiment, OUTPUT_DIR, DEFAULT_BATCH_SIZES, DEFAULT_SEQ_LENGTHS
+from .config import Experiment, OUTPUT_DIR, DEFAULT_BATCH_SIZES, DEFAULT_SEQ_LENGTHS, resolve_model_path
 
 
 def _save(path, data):
@@ -238,7 +238,7 @@ def main():
     args = parser.parse_args()
 
     run_experiment(
-        model_path=args.model,
+        model_path=resolve_model_path(args.model),
         gpu_id=args.gpu,
         output_path=args.output,
         batch_sizes=args.batch_sizes,

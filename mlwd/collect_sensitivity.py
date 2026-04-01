@@ -7,7 +7,7 @@ Usage:
 """
 
 import argparse, json, os, time, threading
-from .config import Experiment, OUTPUT_DIR
+from .config import Experiment, OUTPUT_DIR, resolve_model_path
 from .runner import load_model, make_prompts, run_inference
 from .stress import StressKernels
 
@@ -47,7 +47,7 @@ def main():
     parser.add_argument("--output", default=str(OUTPUT_DIR / "sensitivity.json"))
     args = parser.parse_args()
 
-    exp = Experiment(model=args.model)
+    exp = Experiment(model=resolve_model_path(args.model))
     if args.batch_sizes: exp.batch_sizes = args.batch_sizes
     if args.seq_lengths: exp.seq_lengths = args.seq_lengths
 
