@@ -5,6 +5,12 @@
 set -e
 cd "$(dirname "$0")/.."
 
+# Build CUDA stress kernels if not already built
+if [ ! -f build/cuda/libstress_interface.so ]; then
+    echo "=== Building CUDA stress kernels ==="
+    bash scripts/00_build_cuda.sh
+fi
+
 MODELS=("qwen2.5-7b" "llama-3.1-8b")
 OUTPUT_BASE="results/mlwd"
 
