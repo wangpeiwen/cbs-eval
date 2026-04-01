@@ -1,0 +1,34 @@
+scenarios:
+  disagg_2p2d:
+    description: "Pure PD disaggregation: 2 Prefill + 2 Decode"
+    mode: "disaggregate"
+    prefill_gpus: [0, 1]
+    decode_gpus: [2, 3]
+    routing: "round_robin"
+    kv_connector: "PyNcclConnector"
+  coloc_4:
+    description: "Pure colocation: 4 GPUs all mixed PD (Sarathi-style)"
+    mode: "colocate"
+    gpus: [0, 1, 2, 3]
+    routing: "round_robin"
+    chunked_prefill: true
+    chunk_size: 512
+  cbs_2p2d:
+    description: "CBS dynamic routing: 2P+2D with CBS-aware gateway"
+    mode: "cbs"
+    prefill_gpus: [0, 1]
+    decode_gpus: [2, 3]
+    routing: "cbs_aware"
+    kv_connector: "PyNcclConnector"
+    cbs_params:
+      mu: 2.0
+      lambda_ext: 1.0
+      kappa_dispatch: 0.1
+
+vllm_common:
+  dtype: "float16"
+  enforce_eager: true
+  gpu_memory_utilization: 0.90
+  trust_remote_code: true
+  enable_chunked_prefill: true
+  max_num_batched_tokens: 8192

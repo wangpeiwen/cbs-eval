@@ -1,0 +1,27 @@
+workloads:
+  uniform:
+    arrival: "poisson"
+    input_len_range: [128, 2048]
+    output_len_range: [32, 512]
+    rates: [2, 4, 6, 8, 10]  # req/s, scaled for V100
+  bursty:
+    arrival: "poisson_bursty"
+    base_rate: 4  # req/s
+    burst_multiplier: 4
+    burst_interval_s: 30
+    burst_duration_s: 5
+    input_len_range: [128, 2048]
+    output_len_range: [32, 512]
+  long_context:
+    arrival: "poisson"
+    input_len_range: [1024, 4096]  # capped for V100 memory
+    output_len_range: [64, 256]
+    rates: [1, 2, 4, 6]
+
+slo:
+  ttft_ms: 2000
+  tpot_ms: 100
+
+experiment:
+  duration_s: 600
+  warmup_s: 120

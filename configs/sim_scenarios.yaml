@@ -1,0 +1,55 @@
+scales:
+  small:
+    description: "4-node (2P2D) - matches real for validation"
+    n_prefill: 2
+    n_decode: 2
+  medium:
+    description: "8-node (2P6D) - matches thesis main experiments"
+    n_prefill: 2
+    n_decode: 6
+  large:
+    description: "16-node (4P12D) - scalability evaluation"
+    n_prefill: 4
+    n_decode: 12
+
+baselines:
+  disagg_static:
+    scheduler: "round_robin"
+    enable_migration: false
+    enable_role_adaptation: false
+  coloc_sarathi:
+    scheduler: "cbs"
+    mu: 0  # force all colocate
+    enable_migration: false
+    enable_role_adaptation: false
+  cbs_nomig:
+    scheduler: "cbs"
+    mu: 2.0
+    enable_migration: false
+    enable_role_adaptation: false
+  cbs_norole:
+    scheduler: "cbs"
+    mu: 2.0
+    enable_migration: true
+    enable_role_adaptation: false
+  cbs_full:
+    scheduler: "cbs"
+    mu: 2.0
+    lambda_ext: 1.0
+    kappa_dispatch: 0.1
+    enable_migration: true
+    enable_role_adaptation: true
+    theta_ceil: 0.3
+    theta_floor: 0.4
+    theta_dispatch: 0.85
+    max_migrations_per_scan: 2
+    migration_cooldown_s: 10
+
+simulation:
+  model_type: "qwen2.5-7b"
+  slo_ttft_ms: 2000
+  slo_tpot_ms: 100
+  kv_transfer_latency_ms: 5.0
+  control_latency_ms: 2.0
+  chunked_prefill_max_tokens: 512
+  prefill_max_batch_size: 32
