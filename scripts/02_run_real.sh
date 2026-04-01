@@ -3,7 +3,7 @@
 set -e
 cd "$(dirname "$0")/.."
 
-MODELS=("qwen2.5-7b" "llama-3.2-3b")
+MODELS=("qwen2.5-7b" "llama-3.1-8b")
 SCENARIOS=("disagg_2p2d" "coloc_4" "cbs_2p2d")
 WORKLOADS=("uniform" "bursty" "long_context")
 RATES_UNIFORM="2 4 6 8 10"

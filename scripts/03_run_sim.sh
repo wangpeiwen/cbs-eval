@@ -11,7 +11,7 @@ RATES_LONG="1 2 4 6 8"
 
 # Build interference table from MLWD data
 echo "=== Building interference tables ==="
-for model in "qwen2.5-7b" "llama-3.2-3b"; do
+for model in "qwen2.5-7b" "llama-3.1-8b"; do
     python -m sim.profile_bridge \
         --mlwd-json "results/mlwd/${model}/mlwd_complete.json" \
         --weights-json "results/mlwd/${model}/weights.json" \

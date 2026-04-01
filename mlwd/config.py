@@ -16,6 +16,10 @@ MODEL_PARAMS = {
         "hidden": 3584, "layers": 28, "heads": 28,
         "kv_heads": 4, "head_dim": 128, "inter": 18944,
     },
+    "llama-3.1-8b": {
+        "hidden": 4096, "layers": 32, "heads": 32,
+        "kv_heads": 8, "head_dim": 128, "inter": 14336,
+    },
     "llama-3.2-3b": {
         "hidden": 3072, "layers": 28, "heads": 24,
         "kv_heads": 8, "head_dim": 128, "inter": 8192,
@@ -58,7 +62,7 @@ def get_model_params(model_path: str) -> dict:
     raise ValueError(f"Unknown model: {model_path}. Add to MODEL_PARAMS or provide config.json.")
 
 
-DEFAULT_MODEL = "/data/Qwen/Qwen2.5-7B-Instruct"
+DEFAULT_MODEL = "/data/Qwen2.5-7B-Instruct"
 DEFAULT_BATCH_SIZES = [1, 4]
 DEFAULT_SEQ_LENGTHS = [32, 64, 128]
 FULL_BATCH_SIZES = [1, 4, 16]

@@ -5,7 +5,7 @@
 set -e
 cd "$(dirname "$0")/.."
 
-MODELS=("qwen2.5-7b" "llama-3.2-3b")
+MODELS=("qwen2.5-7b" "llama-3.1-8b")
 OUTPUT_BASE="results/mlwd"
 
 for model in "${MODELS[@]}"; do

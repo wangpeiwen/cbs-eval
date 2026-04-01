@@ -1,0 +1,12 @@
+# Core dependencies
+simpy>=4.0
+numpy>=1.24
+scipy>=1.10
+matplotlib>=3.7
+pyyaml>=6.0
+aiohttp>=3.8
+transformers>=4.36
+
+# GPU dependencies (install separately if needed)
+# vllm>=0.18.0
+# torch>=2.1
