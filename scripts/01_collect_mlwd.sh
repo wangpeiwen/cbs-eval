@@ -17,24 +17,24 @@ for model in "${MODELS[@]}"; do
     python -m mlwd.collect_sensitivity \
         --model "${model}" \
         --output "${OUTPUT_BASE}/${model}/sensitivity.json" \
-        --batch-sizes 1 4 \
-        --seq-lengths 32 64 128 512 2048
+        --batch_sizes 1 4 \
+        --seq_lengths 32 64 128 512 2048
 
     # Nsys profiling (execution mode features)
     echo "  [2/4] Collecting nsys features..."
     python -m mlwd.collect_nsys \
         --model "${model}" \
         --output "${OUTPUT_BASE}/${model}/nsys.json" \
-        --batch-sizes 1 4 \
-        --seq-lengths 32 64 128 512 2048
+        --batch_sizes 1 4 \
+        --seq_lengths 32 64 128 512 2048
 
     # Compute intensity
     echo "  [3/4] Collecting CI..."
     python -m mlwd.collect_ci \
         --model "${model}" \
         --output "${OUTPUT_BASE}/${model}/ci.json" \
-        --batch-sizes 1 4 \
-        --seq-lengths 32 64 128 512 2048
+        --batch_sizes 1 4 \
+        --seq_lengths 32 64 128 512 2048
 
     # Merge
     echo "  [4/4] Merging MLWD data..."
