@@ -5,12 +5,14 @@ from transformers import AutoTokenizer
 
 
 def load_model(model: str, quantization: str = "fp16", tp: int = 1,
-               gpu_memory_utilization: float = 0.80):
+               gpu_memory_utilization: float = 0.80,
+               max_model_len: int = 4096):
     os.environ["VLLM_USE_V1"] = "0"
     from vllm import LLM
     llm = LLM(model=model, dtype="float16", tensor_parallel_size=tp,
               trust_remote_code=True, enforce_eager=True,
-              gpu_memory_utilization=gpu_memory_utilization)
+              gpu_memory_utilization=gpu_memory_utilization,
+              max_model_len=max_model_len)
     tokenizer = AutoTokenizer.from_pretrained(model, trust_remote_code=True)
     return llm, tokenizer
 
