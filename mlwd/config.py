@@ -88,7 +88,7 @@ class StressConfig:
     bs_tb: int = 160;  bs_threads: int = 1024; bs_itrs: int = 100000
     cu_tb: int = 80;   cu_threads: int = 128;  cu_itrs: int = 500000
     l2_tb: int = 40;   l2_threads: int = 1024; l2_bytes: int = V100_L2_BYTES; l2_itrs: int = 10000
-    bw_tb: int = 80;   bw_threads: int = 1024; bw_bytes: int = 256*1024*1024; bw_itrs: int = 200
+    bw_tb: int = 80;   bw_threads: int = 1024; bw_bytes: int = 64*1024*1024;  bw_itrs: int = 200
 
 
 @dataclass
