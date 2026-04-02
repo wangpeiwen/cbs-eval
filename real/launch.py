@@ -46,11 +46,19 @@ class ClusterLauncher:
     # -- topology launchers ----------------------------------------------------
 
     def launch_disagg_2p2d(self) -> None:
-        """2 Prefill (GPU 0,1) + 2 Decode (GPU 2,3) with KV transfer."""
+        """2 Prefill (GPU 0,1) + 2 Decode (GPU 2,3).
+
+        Each instance is a standalone vLLM server.  The gateway enforces the
+        prefill/decode role split by routing requests accordingly:
+          - New requests go to prefill instances (short max_tokens=1 to get
+            the first token, then the gateway re-sends to decode).
+        For simplicity in the benchmark, we treat prefill instances as
+        handling full requests with short output, and decode instances as
+        handling requests with longer output.  The key metric difference
+        vs coloc_4 is that prefill and decode run on separate GPUs.
+        """
         prefill_gpus = self.scenario.get("prefill_gpus", [0, 1])
         decode_gpus = self.scenario.get("decode_gpus", [2, 3])
-        connector = self.scenario.get("kv_connector", "PyNcclConnector")
-        total = len(prefill_gpus) + len(decode_gpus)
         kw = self._common_kwargs()
 
         for i, gpu in enumerate(prefill_gpus):
@@ -58,10 +66,6 @@ class ClusterLauncher:
                 port=_PREFILL_PORT_BASE + i,
                 gpu_id=gpu,
                 role="prefill",
-                kv_connector=connector,
-                kv_role="kv_producer",
-                kv_rank=i,
-                kv_parallel_size=total,
                 **kw,
             )
             self.prefill_instances.append(inst)
@@ -72,10 +76,6 @@ class ClusterLauncher:
                 port=_DECODE_PORT_BASE + i,
                 gpu_id=gpu,
                 role="decode",
-                kv_connector=connector,
-                kv_role="kv_consumer",
-                kv_rank=len(prefill_gpus) + i,
-                kv_parallel_size=total,
                 **kw,
             )
             self.decode_instances.append(inst)
