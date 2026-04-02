@@ -149,7 +149,8 @@ def run_experiment(model_path, gpu_id, output_path,
 
     print(f"Loading {model_name}...")
     llm = LLM(model=model_path, dtype="float16", trust_remote_code=True,
-              enforce_eager=True, gpu_memory_utilization=0.90)
+              enforce_eager=True, gpu_memory_utilization=0.85,
+              max_model_len=4096)
     tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
     print("Model loaded.\n")
 
