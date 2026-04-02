@@ -131,7 +131,9 @@ def run_experiment(model_path, gpu_id, output_path,
     if seq_lengths is None:
         seq_lengths = DEFAULT_SEQ_LENGTHS
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
+    # 仅在未从外部设置 CUDA_VISIBLE_DEVICES 时才设置
+    if "CUDA_VISIBLE_DEVICES" not in os.environ:
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
     os.environ["VLLM_USE_V1"] = "0"
 
     data = _load(output_path)
