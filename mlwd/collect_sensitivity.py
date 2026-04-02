@@ -45,6 +45,9 @@ def main():
     parser.add_argument("--seq_lengths", type=int, nargs="+", default=None)
     parser.add_argument("--lib", default=None)
     parser.add_argument("--output", default=str(OUTPUT_DIR / "sensitivity.json"))
+    parser.add_argument("--force", action="store_true", help="Overwrite existing results")
+    parser.add_argument("--force_dims", nargs="+", default=None,
+                        help="Only force-overwrite specific dims, e.g. --force_dims sigma_cu sigma_l2")
     args = parser.parse_args()
 
     exp = Experiment(model=resolve_model_path(args.model))
@@ -99,10 +102,13 @@ def main():
             print(f"  baseline (cached): {baseline:.2f} ms")
 
         # 逐维度
+        force_dims = set(args.force_dims) if args.force_dims else None
         for dim in DIMS:
-            if dim in existing and existing[dim] is not None:
-                print(f"  {dim}: {existing[dim]:.4f} (cached)")
-                continue
+            should_skip = dim in existing and existing[dim] is not None
+            if should_skip and not args.force:
+                if force_dims is None or dim not in force_dims:
+                    print(f"  {dim}: {existing[dim]:.4f} (cached)")
+                    continue
             print(f"  measuring {dim}...")
             try:
                 stop = threading.Event()
