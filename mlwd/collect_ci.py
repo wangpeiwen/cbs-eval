@@ -51,7 +51,8 @@ def main():
 
     print(f"Loading model: {model_path}...")
     llm = LLM(model=model_path, dtype="float16", trust_remote_code=True,
-              enforce_eager=True,
+              enforce_eager=True, max_model_len=4096,
+              gpu_memory_utilization=0.80,
               profiler_config={"profiler": "torch", "torch_profiler_dir": args.profile_dir})
     tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
     print("Model loaded.\n")
