@@ -14,10 +14,13 @@ _ATTN = [re.compile(p, re.I) for p in [
     r"flash_attn", r"fmha", r"paged_attention", r"unified_attention",
     r"kernel.*attention", r"attention.*kernel", r"scaled_dot_product",
     r"flash.*fwd", r"reshape_and_cache", r"reduce_segments",
+    r"triton.*attn", r"triton.*attention", r"_fwd_kernel",
+    r"context_attention", r"paged.*fwd",
 ]]
 _FFN = [re.compile(p, re.I) for p in [
     r"gemm", r"cublas.*gemm", r"cutlass.*gemm", r"sgemm", r"hgemm",
     r"volta.*gemm", r"sm70.*gemm", r"linear", r"mlp.*kernel",
+    r"volta_fp16", r"volta_s.*gemm",
 ]]
 _ATTN_GEMM = [re.compile(p, re.I) for p in [
     r"attn.*gemm", r"attention.*gemm", r"qkv.*gemm",

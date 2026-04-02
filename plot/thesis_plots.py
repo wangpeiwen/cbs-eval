@@ -433,8 +433,175 @@ def plot_real_vs_sim(
 
 
 # ------------------------------------------------------------------
-# Generate all figures
+# Fig 6-x: Threshold sensitivity (theta_ceil, theta_floor)
 # ------------------------------------------------------------------
+
+def plot_threshold_sensitivity(
+    results_dir: str,
+    output_path: str = "fig_threshold_sensitivity.pdf",
+    slo_ttft: float = 2000.0,
+    slo_tpot: float = 100.0,
+    warmup_s: float = 120.0,
+) -> None:
+    """Bar chart: goodput and migration count vs theta_ceil / theta_floor."""
+    from analysis.sensitivity import threshold_sensitivity
+
+    sweep = threshold_sensitivity(
+        results_dir,
+        slo_ttft=slo_ttft,
+        slo_tpot=slo_tpot,
+        warmup_s=warmup_s,
+    )
+    if not sweep.get("ceil_values"):
+        return
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
+
+    # theta_ceil
+    vals = sweep["ceil_values"]
+    gp = sweep["ceil_goodput"]
+    slo = sweep["ceil_slo"]
+    x = np.arange(len(vals))
+    ax1.bar(x - 0.15, gp, 0.3, color=COLORS["cbs_full"], label="Goodput")
+    ax1_t = ax1.twinx()
+    ax1_t.plot(x, slo, "s--", color=COLORS["disagg_static"], label="SLO%")
+    ax1.set_xticks(x)
+    ax1.set_xticklabels([str(v) for v in vals])
+    ax1.set_xlabel(r"$\theta_{\mathrm{ceil}}$")
+    ax1.set_ylabel("Goodput (req/s)")
+    ax1_t.set_ylabel("SLO Attainment (%)")
+    ax1_t.set_ylim(80, 100)
+    ax1.set_title(r"$\theta_{\mathrm{ceil}}$ 敏感性")
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax1_t.get_legend_handles_labels()
+    ax1.legend(lines1 + lines2, labels1 + labels2, loc="lower right")
+
+    # theta_floor
+    vals2 = sweep["floor_values"]
+    gp2 = sweep["floor_goodput"]
+    slo2 = sweep["floor_slo"]
+    x2 = np.arange(len(vals2))
+    ax2.bar(x2 - 0.15, gp2, 0.3, color=COLORS["cbs_full"], label="Goodput")
+    ax2_t = ax2.twinx()
+    ax2_t.plot(x2, slo2, "s--", color=COLORS["disagg_static"], label="SLO%")
+    ax2.set_xticks(x2)
+    ax2.set_xticklabels([str(v) for v in vals2])
+    ax2.set_xlabel(r"$\theta_{\mathrm{floor}}$")
+    ax2.set_ylabel("Goodput (req/s)")
+    ax2_t.set_ylabel("SLO Attainment (%)")
+    ax2_t.set_ylim(80, 100)
+    ax2.set_title(r"$\theta_{\mathrm{floor}}$ 敏感性")
+
+    fig.tight_layout()
+    fig.savefig(output_path)
+    plt.close(fig)
+
+
+# ------------------------------------------------------------------
+# Fig 6-x: Mu sensitivity curve
+# ------------------------------------------------------------------
+
+def plot_mu_sensitivity(
+    results_dir: str,
+    output_path: str = "fig_mu_sensitivity.pdf",
+    mu_values: Optional[List[float]] = None,
+    slo_ttft: float = 2000.0,
+    slo_tpot: float = 100.0,
+    warmup_s: float = 120.0,
+) -> None:
+    """Dual-axis plot: goodput and SLO attainment vs mu."""
+    from analysis.sensitivity import mu_sensitivity
+
+    sweep = mu_sensitivity(
+        results_dir,
+        mu_values=mu_values,
+        slo_ttft=slo_ttft,
+        slo_tpot=slo_tpot,
+        warmup_s=warmup_s,
+    )
+    if not sweep["values"]:
+        return
+
+    vals = sweep["values"]
+    fig, ax1 = plt.subplots()
+    color_gp = COLORS["cbs_full"]
+    color_slo = COLORS["disagg_static"]
+
+    ax1.plot(vals, sweep["goodput"], marker="o", color=color_gp,
+             linewidth=1.5, markersize=6, label="Goodput")
+    ax1.set_xlabel(r"$\mu$")
+    ax1.set_ylabel("Goodput (req/s)", color=color_gp)
+    ax1.tick_params(axis="y", labelcolor=color_gp)
+
+    ax2 = ax1.twinx()
+    ax2.plot(vals, sweep["slo_attainment"], marker="s", color=color_slo,
+             linewidth=1.5, markersize=6, linestyle="--", label="SLO%")
+    ax2.set_ylabel("SLO Attainment (%)", color=color_slo)
+    ax2.tick_params(axis="y", labelcolor=color_slo)
+    ax2.set_ylim(0, 105)
+
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines1 + lines2, labels1 + labels2, loc="lower right")
+    ax1.set_title(r"$\mu$ 敏感性分析")
+    fig.tight_layout()
+    fig.savefig(output_path)
+    plt.close(fig)
+
+
+# ------------------------------------------------------------------
+# Fig 6-x: Bursty & long-context workload comparison
+# ------------------------------------------------------------------
+
+def plot_workload_comparison(
+    results_dir: str,
+    output_path: str = "fig_workload_comparison.pdf",
+    slo_ttft: float = 2000.0,
+    slo_tpot: float = 100.0,
+    warmup_s: float = 120.0,
+) -> None:
+    """Grouped bar chart: goodput under uniform / bursty / long-context."""
+    rdir = Path(results_dir)
+    workloads = ["uniform", "bursty", "long_context"]
+    wl_labels = ["均匀负载", "突发负载", "长上下文"]
+    systems = ["disagg_static", "coloc_sarathi", "cbs_full"]
+
+    data = {wl: {} for wl in workloads}
+    for wl in workloads:
+        for sys_name in systems:
+            # Try to find any rate file
+            wl_dir = rdir / wl
+            if not wl_dir.exists():
+                continue
+            for sub in sorted(wl_dir.iterdir()):
+                fpath = sub / f"{sys_name}.json" if sub.is_dir() else None
+                if fpath and fpath.exists():
+                    m = compute_metrics(str(fpath), slo_ttft=slo_ttft,
+                                        slo_tpot=slo_tpot, warmup_s=warmup_s)
+                    data[wl][sys_name] = m.goodput
+                    break
+
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    x = np.arange(len(workloads))
+    n_sys = len(systems)
+    w = 0.22
+
+    for i, sys_name in enumerate(systems):
+        vals = [data[wl].get(sys_name, 0) for wl in workloads]
+        offset = (i - n_sys / 2 + 0.5) * w
+        ax.bar(x + offset, vals, w,
+               color=COLORS.get(sys_name, "gray"),
+               label=LABELS.get(sys_name, sys_name),
+               edgecolor="white")
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(wl_labels)
+    ax.set_ylabel("Goodput (req/s)")
+    ax.set_title("不同负载模式下的 Goodput 对比")
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(output_path)
+    plt.close(fig)
 
 def generate_all(
     results_dir: str,
@@ -444,19 +611,44 @@ def generate_all(
     real_dir: Optional[str] = None,
     sim_dir: Optional[str] = None,
 ) -> None:
-    """Produce every Chapter 6 figure and save to *output_dir*."""
+    """Produce every Chapter 6 figure and save to *output_dir*.
+
+    Complete figure list (10 figures):
+      1. fig_goodput_vs_rate.pdf      — §6.3 Goodput vs 到达率曲线
+      2. fig_slo_attainment.pdf       — §6.3.4 SLO 达标率柱状图
+      3. fig_tail_latency.pdf         — §6.3.5 P99 TTFT / TPOT 对比
+      4. fig_interference_accuracy.pdf— §6.2 干扰估算散点图
+      5. fig_ablation.pdf             — §6.4 消融实验柱状图
+      6. fig_lambda_sensitivity.pdf   — §6.5.1 λ 敏感性曲线
+      7. fig_threshold_sensitivity.pdf— §6.5.2 迁移阈值敏感性
+      8. fig_mu_sensitivity.pdf       — §6.5.3 μ 敏感性曲线
+      9. fig_real_vs_sim.pdf          — §6.3.3 真实 vs 模拟一致性
+     10. fig_workload_comparison.pdf  — §6.3.6 不同负载模式对比
+    """
     setup_thesis_style()
     os.makedirs(output_dir, exist_ok=True)
     out = Path(output_dir)
 
+    # Core scheduling evaluation
     plot_goodput_vs_rate(results_dir, model, str(out / "fig_goodput_vs_rate.pdf"))
     plot_slo_attainment(results_dir, model, str(out / "fig_slo_attainment.pdf"))
     plot_tail_latency(results_dir, model, str(out / "fig_tail_latency.pdf"))
-    plot_ablation(results_dir, str(out / "fig_ablation.pdf"))
-    plot_lambda_sensitivity(results_dir, str(out / "fig_lambda_sensitivity.pdf"))
 
+    # Ablation
+    plot_ablation(results_dir, str(out / "fig_ablation.pdf"))
+
+    # Sensitivity analysis
+    plot_lambda_sensitivity(results_dir, str(out / "fig_lambda_sensitivity.pdf"))
+    plot_threshold_sensitivity(results_dir, str(out / "fig_threshold_sensitivity.pdf"))
+    plot_mu_sensitivity(results_dir, str(out / "fig_mu_sensitivity.pdf"))
+
+    # Workload comparison (bursty / long-context)
+    plot_workload_comparison(results_dir, str(out / "fig_workload_comparison.pdf"))
+
+    # MLWD accuracy (requires separate data file)
     if mlwd_results_path and Path(mlwd_results_path).exists():
         plot_interference_accuracy(mlwd_results_path, str(out / "fig_interference_accuracy.pdf"))
 
+    # Real vs simulation consistency
     if real_dir and sim_dir:
         plot_real_vs_sim(real_dir, sim_dir, str(out / "fig_real_vs_sim.pdf"))

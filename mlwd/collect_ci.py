@@ -12,14 +12,24 @@ from .classifier import classify, Cat
 
 
 def attn_flops(b, s, mp, max_tokens=32):
+    """Attention FLOPs: prefill + decode (summed over all decode steps)."""
     h, d, nh, nkv, L = mp["hidden"], mp["head_dim"], mp["heads"], mp["kv_heads"], mp["layers"]
+    # Prefill: QKV projection + QK matmul + AV matmul + output projection
     qkv = 2 * b * s * h * (h + 2 * nkv * d)
     qk = 2 * b * nh * s * s * d
     av = 2 * b * nh * s * s * d
     out = 2 * b * s * h * h
     prefill = (qkv + qk + av + out) * L
-    decode_per_step = (2*b*1*h*(h+2*nkv*d) + 2*b*nh*1*1*d*2 + 2*b*1*h*h) * L
-    return prefill + decode_per_step * max_tokens
+    # Decode: each step attends to (s + step) tokens; sum over max_tokens steps
+    decode_total = 0
+    for t in range(max_tokens):
+        s_cur = s + t + 1  # context length at this step
+        qkv_d = 2 * b * 1 * h * (h + 2 * nkv * d)
+        qk_d = 2 * b * nh * 1 * s_cur * d
+        av_d = 2 * b * nh * 1 * s_cur * d
+        out_d = 2 * b * 1 * h * h
+        decode_total += (qkv_d + qk_d + av_d + out_d) * L
+    return prefill + decode_total
 
 
 def ffn_flops(b, s, mp, max_tokens=32):
