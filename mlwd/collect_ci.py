@@ -48,6 +48,8 @@ def main():
     parser.add_argument("--num_runs", type=int, default=3)
     parser.add_argument("--profile_dir", default="/tmp/vllm_profile")
     parser.add_argument("--output", default=str(OUTPUT_DIR / "ci.json"))
+    parser.add_argument("--tp", type=int, default=1, help="Tensor parallel size")
+    parser.add_argument("--max_model_len", type=int, default=4096)
     args = parser.parse_args()
 
     os.environ["VLLM_USE_V1"] = "0"
@@ -61,8 +63,9 @@ def main():
 
     print(f"Loading model: {model_path}...")
     llm = LLM(model=model_path, dtype="float16", trust_remote_code=True,
-              enforce_eager=True, max_model_len=4096,
+              enforce_eager=True, max_model_len=args.max_model_len,
               gpu_memory_utilization=0.80,
+              tensor_parallel_size=args.tp,
               profiler_config={"profiler": "torch", "torch_profiler_dir": args.profile_dir})
     tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
     print("Model loaded.\n")
