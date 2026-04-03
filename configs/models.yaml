@@ -25,6 +25,32 @@ models:
     vram_gb: 16.0
     max_model_len: 8192
     max_num_batched_tokens: 8192
+  qwen2.5-32b:
+    path: "/data/Qwen2.5-32B-Instruct"
+    params: "32B"
+    attention: "GQA"
+    kv_heads: 8
+    num_layers: 64
+    hidden_dim: 5120
+    head_dim: 128
+    dtype: "float16"
+    tp: 4
+    vram_gb: 64.0
+    max_model_len: 2048
+    max_num_batched_tokens: 2048
+  qwen3-14b:
+    path: "/data/Qwen3-14B"
+    params: "14B"
+    attention: "GQA"
+    kv_heads: 8
+    num_layers: 40
+    hidden_dim: 5120
+    head_dim: 128
+    dtype: "float16"
+    tp: 2
+    vram_gb: 28.0
+    max_model_len: 4096
+    max_num_batched_tokens: 4096
 
 hardware:
   gpu: "V100-32GB"

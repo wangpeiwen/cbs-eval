@@ -4,12 +4,16 @@
 # Measured on V100-32GB with Qwen2.5-7B FP16, enforce_eager
 V100_PREFILL_COEFFS = {
     "qwen2.5-7b": {"a": 15.0, "b": 0.025, "c": 2.5e-7},
+    "qwen2.5-32b": {"a": 60.0, "b": 0.10, "c": 1.0e-6},
+    "qwen3-14b": {"a": 30.0, "b": 0.05, "c": 5.0e-7},
     "llama-3.1-8b": {"a": 16.0, "b": 0.028, "c": 2.8e-7},
 }
 
 # Decode step latency: base_ms + per_token_ms * batch_size (ms)
 V100_DECODE_COEFFS = {
     "qwen2.5-7b": {"base_ms": 28.0, "per_token_ms": 1.2},
+    "qwen2.5-32b": {"base_ms": 110.0, "per_token_ms": 5.0},
+    "qwen3-14b": {"base_ms": 55.0, "per_token_ms": 2.5},
     "llama-3.1-8b": {"base_ms": 30.0, "per_token_ms": 1.3},
 }
 
@@ -31,6 +35,8 @@ def estimate_kv_transfer_latency(input_tokens: int, model: str = "qwen2.5-7b") -
     # KV size = 2 * layers * kv_heads * head_dim * seq_len * sizeof(fp16)
     model_params = {
         "qwen2.5-7b": {"layers": 28, "kv_heads": 4, "head_dim": 128},
+        "qwen2.5-32b": {"layers": 64, "kv_heads": 8, "head_dim": 128},
+        "qwen3-14b": {"layers": 40, "kv_heads": 8, "head_dim": 128},
         "llama-3.1-8b": {"layers": 32, "kv_heads": 8, "head_dim": 128},
     }
     p = model_params.get(model, model_params["qwen2.5-7b"])

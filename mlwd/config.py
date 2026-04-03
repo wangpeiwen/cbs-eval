@@ -16,6 +16,14 @@ MODEL_PARAMS = {
         "hidden": 3584, "layers": 28, "heads": 28,
         "kv_heads": 4, "head_dim": 128, "inter": 18944,
     },
+    "qwen2.5-32b": {
+        "hidden": 5120, "layers": 64, "heads": 40,
+        "kv_heads": 8, "head_dim": 128, "inter": 27648,
+    },
+    "qwen3-14b": {
+        "hidden": 5120, "layers": 40, "heads": 40,
+        "kv_heads": 8, "head_dim": 128, "inter": 17408,
+    },
     "llama-3.1-8b": {
         "hidden": 4096, "layers": 32, "heads": 32,
         "kv_heads": 8, "head_dim": 128, "inter": 14336,
@@ -65,6 +73,8 @@ def get_model_params(model_path: str) -> dict:
 # 短名称 → 本地绝对路径映射（离线服务器无外网，必须用本地路径）
 MODEL_PATH_MAP = {
     "qwen2.5-7b": "/data/Qwen2.5-7B-Instruct",
+    "qwen2.5-32b": "/data/Qwen2.5-32B-Instruct",
+    "qwen3-14b": "/data/Qwen3-14B",
     "llama-3.1-8b": "/data/Llama-3.1-8B-Instruct",
 }
 

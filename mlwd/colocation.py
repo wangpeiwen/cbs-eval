@@ -125,7 +125,8 @@ def measure_pd_colocation(llm, tokenizer, decode_batch, decode_seq,
 
 def run_experiment(model_path, gpu_id, output_path,
                    batch_sizes=None, seq_lengths=None,
-                   num_runs=5, warmup=2, max_tokens=32):
+                   num_runs=5, warmup=2, max_tokens=32,
+                   tp=1, max_model_len=4096):
     if batch_sizes is None:
         batch_sizes = DEFAULT_BATCH_SIZES
     if seq_lengths is None:
@@ -152,7 +153,7 @@ def run_experiment(model_path, gpu_id, output_path,
     print(f"Loading {model_name}...")
     llm = LLM(model=model_path, dtype="float16", trust_remote_code=True,
               enforce_eager=True, gpu_memory_utilization=0.85,
-              max_model_len=4096)
+              max_model_len=max_model_len, tensor_parallel_size=tp)
     tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
     print("Model loaded.\n")
 
@@ -238,6 +239,8 @@ def main():
     parser.add_argument("--num_runs", type=int, default=5)
     parser.add_argument("--warmup", type=int, default=2)
     parser.add_argument("--max_tokens", type=int, default=32)
+    parser.add_argument("--tp", type=int, default=1, help="Tensor parallel size")
+    parser.add_argument("--max_model_len", type=int, default=4096)
     args = parser.parse_args()
 
     run_experiment(
@@ -249,6 +252,8 @@ def main():
         num_runs=args.num_runs,
         warmup=args.warmup,
         max_tokens=args.max_tokens,
+        tp=args.tp,
+        max_model_len=args.max_model_len,
     )
 
 

@@ -48,6 +48,8 @@ def main():
     parser.add_argument("--force", action="store_true", help="Overwrite existing results")
     parser.add_argument("--force_dims", nargs="+", default=None,
                         help="Only force-overwrite specific dims, e.g. --force_dims sigma_cu sigma_l2")
+    parser.add_argument("--tp", type=int, default=1, help="Tensor parallel size")
+    parser.add_argument("--max_model_len", type=int, default=4096)
     args = parser.parse_args()
 
     exp = Experiment(model=resolve_model_path(args.model))
@@ -58,7 +60,7 @@ def main():
     results = _load(args.output)
 
     print(f"Loading model: {exp.model}...")
-    llm, tokenizer = load_model(exp.model)
+    llm, tokenizer = load_model(exp.model, tp=args.tp, max_model_len=args.max_model_len)
     print("Model loaded.\n")
 
     from vllm import SamplingParams
