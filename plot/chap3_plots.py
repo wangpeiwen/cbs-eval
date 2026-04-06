@@ -285,27 +285,41 @@ def plot_alpha_prediction(
     setup_thesis_style()
 
     data = _load(calibration_path)
-    q = data["qwen"]
-    l = data["llama"]
     mae = data["combined"]["mae"]
     r2 = data["combined"]["r2"]
-    n = data["n_samples"]["total"]
+
+    # Detect per-model keys dynamically
+    model_keys = [k for k in data.keys()
+                  if k not in ("method", "combined", "n_samples", "weights", "intercept",
+                               "scaler_mean", "scaler_scale", "cv_mae", "cv_r2")]
+
+    model_colors = ["#4c72b0", "#dd8452", "#55a868", "#c44e52", "#8c564b"]
+    model_markers = ["o", "s", "^", "D", "v"]
 
     fig, ax = plt.subplots(figsize=(5.5, 5))
 
-    all_vals = q["y_true"] + q["y_pred"] + l["y_true"] + l["y_pred"]
-    lo = min(all_vals) - 0.01
-    hi = max(all_vals) + 0.01
+    all_true, all_pred = [], []
+    for mk in model_keys:
+        all_true.extend(data[mk]["y_true"])
+        all_pred.extend(data[mk]["y_pred"])
+
+    lo = min(min(all_true), min(all_pred)) - 0.01
+    hi = max(max(all_true), max(all_pred)) + 0.01
     ax.plot([lo, hi], [lo, hi], "k--", linewidth=0.8, label="Perfect prediction")
 
-    ax.scatter(q["y_true"], q["y_pred"], c="#4c72b0", marker="o", s=40,
-               alpha=0.7, edgecolors="white", linewidth=0.5, label=f"Qwen2.5-7B (n={data['n_samples']['qwen']})")
-    ax.scatter(l["y_true"], l["y_pred"], c="#dd8452", marker="s", s=40,
-               alpha=0.7, edgecolors="white", linewidth=0.5, label=f"LLaMA-3.1-8B (n={data['n_samples']['llama']})")
+    n_total = data["n_samples"]["total"]
+    for i, mk in enumerate(model_keys):
+        n_i = len(data[mk]["y_true"])
+        label = mk.replace("_", " ").replace("25 ", "2.5-").replace("31 ", "3.1-").replace("3 ", "3-")
+        label = f"{label} (n={n_i})"
+        ax.scatter(data[mk]["y_true"], data[mk]["y_pred"],
+                   c=model_colors[i % len(model_colors)],
+                   marker=model_markers[i % len(model_markers)],
+                   s=40, alpha=0.7, edgecolors="white", linewidth=0.5, label=label)
 
     ax.set_xlabel("Ground-truth $\\alpha_d$")
     ax.set_ylabel("Predicted $\\hat{\\alpha}_d$")
-    ax.set_title(f"Interference Coefficient Prediction\n(n={n}, MAE={mae:.4f}, $R^2$={r2:.3f})")
+    ax.set_title(f"Interference Coefficient Prediction\n(n={n_total}, MAE={mae:.4f}, $R^2$={r2:.3f})")
     ax.legend(fontsize=9, loc="upper left")
     ax.set_xlim(lo, hi)
     ax.set_ylim(lo, hi)
