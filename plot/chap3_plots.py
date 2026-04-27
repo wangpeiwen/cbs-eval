@@ -31,25 +31,24 @@ def _load(path):
 # ─────────────────────────────────────────────────────────
 
 def plot_sensitivity_heatmap(
-    qwen_sens: dict, llama_sens: dict,
+    *model_args,
     output_path: str = "results/figures/fig_sensitivity_heatmap.jpg",
 ):
-    """2x2 heatmap: rows=model, cols=phase. Only common complete rows."""
+    """NxM heatmap: rows=model, cols=phase. Accepts (name, data) pairs.
+    Only common complete rows across ALL models."""
     setup_thesis_style()
+
+    models = list(model_args)
+    n_models = len(models)
 
     dims = ["sigma_bs", "sigma_cu", "sigma_l2", "sigma_bw"]
     dim_labels = ["$\\sigma_{\\mathrm{bs}}$", "$\\sigma_{\\mathrm{cu}}$",
                   "$\\sigma_{\\mathrm{l2}}$", "$\\sigma_{\\mathrm{bw}}$"]
     seq_lengths = [32, 64, 128, 512, 2048]
     batches = [1, 4]
-
-    models = [
-        ("Qwen2.5-7B", qwen_sens),
-        ("LLaMA-3.1-8B", llama_sens),
-    ]
     phases = ["prefill", "decode"]
 
-    # Find (b, s) combos where BOTH models have complete data for BOTH phases
+    # Find (b, s) combos where ALL models have complete data for BOTH phases
     common_bs = []
     for b in batches:
         for s in seq_lengths:
@@ -69,7 +68,9 @@ def plot_sensitivity_heatmap(
 
     row_labels = [f"b={b}, s={s}" for b, s in common_bs]
 
-    fig, axes = plt.subplots(2, 2, figsize=(8, 8))
+    fig, axes = plt.subplots(n_models, 2, figsize=(8, 4 * n_models))
+    if n_models == 1:
+        axes = [axes]
 
     vmin, vmax = 0, 2.0
     im = None
@@ -259,11 +260,16 @@ def plot_sensitivity_trend(
 def main():
     qwen_sens = _load("results/qwen-2.5-7b-sensitivity.json")
     llama_sens = _load("results/llama-3.1-8b-sensitivity.json")
+    qwen3_sens = _load("results/qwen3-14b-sensitivity.json")
     qwen_ci = _load("results/qwen2.5-7B-ci.json")
     llama_ci = _load("results/llama-3.1-8B-ci.json")
     qwen_coloc = _load("results/qwen2.5-7b-colocation.json")
 
-    plot_sensitivity_heatmap(qwen_sens, llama_sens)
+    plot_sensitivity_heatmap(
+        ("Qwen2.5-7B", qwen_sens),
+        ("LLaMA-3.1-8B", llama_sens),
+        ("Qwen3-14B", qwen3_sens),
+    )
     plot_phase_heterogeneity(qwen_ci, llama_ci, qwen_sens, llama_sens)
     plot_alpha_d_trend(qwen_coloc)
     plot_sensitivity_trend(qwen_sens, llama_sens)

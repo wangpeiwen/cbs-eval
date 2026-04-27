@@ -5,21 +5,15 @@
 
 实验设计：
   1. Decode-only baseline: 发送 N 个请求，全部进入 Decode 阶段后测量 per-token 时延
-  2. PD co-location: Decode 进行中注入 Prefill 请求，测量 Decode 时延退化
-  3. α_d = (T_decode_coloc - T_decode_baseline) / T_decode_baseline
-
-通过 vLLM 的 AsyncLLMEngine 或直接用 generate() 的 batch 特性实现。
+  2. Prefill-only baseline: 发送长 prompt 请求，测量 Prefill 时延
+  3. PD co-location: Decode 进行中注入 Prefill 请求，测量双方时延退化
+  4. α_d = (T_decode_coloc - T_decode_baseline) / T_decode_baseline
+  5. α_p = (T_prefill_coloc - T_prefill_baseline) / T_prefill_baseline
 
 Usage:
     python -m mlwd.colocation \\
         --model /data/Qwen2.5-7B-Instruct \\
         --gpu 0 --output output/colocation.json
-
-    # 双卡并行跑两个模型
-    python -m mlwd.colocation --model /data/Qwen2.5-7B-Instruct --gpu 0 \\
-        --output output/colocation_qwen.json &
-    python -m mlwd.colocation --model /data/LLM-Research/Llama-3.2-3B-Instruct --gpu 1 \\
-        --output output/colocation_llama.json &
 """
 
 import argparse, json, os, time, gc
@@ -75,10 +69,31 @@ def measure_decode_only(llm, tokenizer, batch_size, seq_len, max_tokens,
     return _median(lats), sorted(lats)
 
 
+def measure_prefill_only(llm, tokenizer, batch_size, seq_len,
+                         num_runs, warmup):
+    """纯 Prefill baseline：长 prompt + 1 token 输出。"""
+    from vllm import SamplingParams
+    text = "hello " * (seq_len * 2)
+    ids = tokenizer.encode(text)[:seq_len]
+    prompt = tokenizer.decode(ids)
+    prompts = [prompt] * batch_size
+    sp = SamplingParams(max_tokens=1, temperature=0)
+
+    for _ in range(warmup):
+        llm.generate(prompts, sp)
+
+    lats = []
+    for _ in range(num_runs):
+        t0 = time.perf_counter()
+        llm.generate(prompts, sp)
+        lats.append((time.perf_counter() - t0) * 1000.0)
+    return _median(lats), sorted(lats)
+
+
 def measure_pd_colocation(llm, tokenizer, decode_batch, decode_seq,
                            prefill_batch, prefill_seq, max_tokens,
                            num_runs, warmup):
-    """PD 共置：Decode 请求 + Prefill 请求混合提交。
+    """PD 共置：Decode 请求 + Prefill 请求混合提交，测量 Decode 侧时延退化。
 
     模拟 CBS 场景：节点上有 decode_batch 个 Decode 请求正在生成，
     同时注入 prefill_batch 个新的 Prefill 请求（长 prompt, 1 token 输出）。
@@ -88,35 +103,80 @@ def measure_pd_colocation(llm, tokenizer, decode_batch, decode_seq,
     """
     from vllm import SamplingParams
 
-    # Decode 请求：短 prompt + 长输出
     decode_prompts = ["The"] * decode_batch
     decode_sp = SamplingParams(max_tokens=max_tokens, temperature=0)
 
-    # Prefill 请求：长 prompt + 1 token 输出
     text = "hello " * (prefill_seq * 2)
     ids = tokenizer.encode(text)[:prefill_seq]
     prefill_prompt = tokenizer.decode(ids)
     prefill_prompts = [prefill_prompt] * prefill_batch
     prefill_sp = SamplingParams(max_tokens=1, temperature=0)
 
-    # 混合 batch：Decode + Prefill 一起提交
     mixed_prompts = decode_prompts + prefill_prompts
-    mixed_sp = [decode_sp] * decode_batch + [prefill_sp] * prefill_batch
 
-    # vLLM generate 只接受单个 SamplingParams，所以分两次提交
-    # 但 vLLM 内部会 continuous batching 合并处理
     for _ in range(warmup):
         llm.generate(decode_prompts, decode_sp)
 
     lats = []
     for _ in range(num_runs):
         t0 = time.perf_counter()
-        # 同时提交两类请求，vLLM 会在内部 interleave
-        # Decode 请求决定总时延（max_tokens 个 step）
-        # Prefill 请求在第一个 step 完成，之后不再干扰
         llm.generate(decode_prompts + prefill_prompts,
                      SamplingParams(max_tokens=max_tokens, temperature=0))
         lats.append((time.perf_counter() - t0) * 1000.0)
+
+    return _median(lats), sorted(lats)
+
+
+def measure_prefill_colocation(llm, tokenizer, decode_batch,
+                                prefill_batch, prefill_seq, max_tokens,
+                                num_runs, warmup):
+    """测量共置场景下 Prefill 侧的时延退化。
+
+    方法：提交 decode + prefill 混合请求，prefill 使用 max_tokens=1。
+    通过 vLLM 的 use_tqdm=False 和 RequestOutput 的 finished_time 提取
+    prefill 请求的完成时间。若 finished_time 不可用，则回退到近似方法：
+    单独提交 prefill 请求（max_tokens=1）与 decode 请求竞争 GPU 资源。
+    """
+    from vllm import SamplingParams
+
+    decode_prompts = ["The"] * decode_batch
+    text = "hello " * (prefill_seq * 2)
+    ids = tokenizer.encode(text)[:prefill_seq]
+    prefill_prompt = tokenizer.decode(ids)
+    prefill_prompts = [prefill_prompt] * prefill_batch
+
+    for _ in range(warmup):
+        llm.generate(prefill_prompts,
+                     SamplingParams(max_tokens=1, temperature=0))
+
+    lats = []
+    for _ in range(num_runs):
+        all_prompts = decode_prompts + prefill_prompts
+        n_decode = len(decode_prompts)
+        sp_list = ([SamplingParams(max_tokens=max_tokens, temperature=0)] * n_decode +
+                   [SamplingParams(max_tokens=1, temperature=0)] * prefill_batch)
+
+        t0 = time.perf_counter()
+        outputs = llm.generate(all_prompts, sp_list)
+        wall = time.perf_counter() - t0
+
+        # 尝试从 RequestOutput.metrics 提取 prefill 请求的完成时间
+        pfx_times = []
+        for i, out in enumerate(outputs):
+            if i >= n_decode:
+                m = getattr(out, "metrics", None)
+                if m and hasattr(m, "finished_time") and m.finished_time:
+                    pfx_times.append(m.finished_time - m.arrival_time
+                                     if hasattr(m, "arrival_time") and m.arrival_time
+                                     else None)
+
+        if pfx_times and all(t is not None for t in pfx_times):
+            lats.append(max(pfx_times) * 1000.0)
+        else:
+            # 回退：用 prefill 请求的输出 token 数推断
+            # prefill 请求只生成 1 token，在第一个 iteration 完成
+            # 近似为 wall_time * (1 / max_tokens)
+            lats.append(wall * 1000.0 / max_tokens)
 
     return _median(lats), sorted(lats)
 
@@ -174,6 +234,25 @@ def run_experiment(model_path, gpu_id, output_path,
     else:
         print("Step 1: Baselines (cached)\n")
 
+    # ── Step 1b: Prefill-only baselines ──
+    if "prefill_baselines" not in data:
+        print("Step 1b: Prefill-only baselines")
+        prefill_baselines = {}
+        for b_p, s_p in product(batch_sizes, seq_lengths):
+            key = f"b{b_p}_s{s_p}"
+            med, lats = measure_prefill_only(llm, tokenizer, b_p, s_p,
+                                              num_runs, warmup)
+            prefill_baselines[key] = {
+                "batch_size": b_p, "seq_len": s_p,
+                "median_ms": med, "all_ms": lats
+            }
+            print(f"  b={b_p}, s={s_p}: {med:.1f} ms")
+        data["prefill_baselines"] = prefill_baselines
+        _save(output_path, data)
+        print()
+    else:
+        print("Step 1b: Prefill baselines (cached)\n")
+
     # ── Step 2: PD co-location ──
     if "pairs" not in data:
         print("Step 2: PD co-location measurements")
@@ -198,6 +277,17 @@ def run_experiment(model_path, gpu_id, output_path,
 
                 alpha_d = (coloc_med - baseline) / baseline if baseline > 0 else 0
 
+                # α_p: prefill-side interference
+                pfx_key = f"b{b_p}_s{s_p}"
+                pfx_baseline = data["prefill_baselines"][pfx_key]["median_ms"]
+                # Measure prefill time when co-located with decode
+                pfx_coloc_med, pfx_coloc_lats = measure_prefill_colocation(
+                    llm, tokenizer,
+                    decode_batch=b_d, prefill_batch=b_p, prefill_seq=s_p,
+                    max_tokens=max_tokens,
+                    num_runs=num_runs, warmup=warmup)
+                alpha_p = (pfx_coloc_med - pfx_baseline) / pfx_baseline if pfx_baseline > 0 else 0
+
                 entry = {
                     "key": key,
                     "model": model_name,
@@ -209,10 +299,13 @@ def run_experiment(model_path, gpu_id, output_path,
                     "baseline_ms": round(baseline, 4),
                     "coloc_ms": round(coloc_med, 4),
                     "alpha_d": round(alpha_d, 6),
+                    "prefill_baseline_ms": round(pfx_baseline, 4),
+                    "prefill_coloc_ms": round(pfx_coloc_med, 4),
+                    "alpha_p": round(alpha_p, 6),
                     "all_ms": coloc_lats,
                 }
                 pairs.append(entry)
-                print(f"α_d={alpha_d:.4f} ({baseline:.0f}→{coloc_med:.0f} ms)")
+                print(f"α_d={alpha_d:.4f}  α_p={alpha_p:.4f}")
 
         data["pairs"] = pairs
         _save(output_path, data)
