@@ -4,9 +4,9 @@
 
 Usage:
     python3 -m analysis.feature_importance_full \
-        --mlwd results/qwen2.5-7b-mlwd_complete.json \
-        --colocation results/qwen2.5-7b-colocation.json \
-        --output results/qwen-feature-importance-full.json
+        --mlwd results/mlwd/qwen2.5-7b/mlwd_complete.json \
+        --colocation results/colocation/qwen2.5-7b.json \
+        --output results/mlwd/qwen2.5-7b/feature_importance.json
 """
 
 import argparse, json

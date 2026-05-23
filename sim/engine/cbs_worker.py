@@ -76,6 +76,7 @@ class CBSWorker(Worker):
         num_tokens_ctx = sum(x.current_context_len for x in (prefill_items + decode_reqs))
         if self.is_first_in_pipeline:
             delay += self.add_ray_overhead(num_tokens_ctx)
+        delay *= self.service_time_scale
 
         self._prefill_ips = len(prefill_items)
         yield self.env.timeout(delay)
@@ -136,5 +137,6 @@ class CBSWorker(Worker):
         num_tokens = sum(x.current_context_len for x in decode_reqs)
         if self.is_first_in_pipeline:
             delay += self.add_ray_overhead(num_tokens)
+        delay *= self.service_time_scale
         yield self.env.timeout(delay)
         self._exit_decode(decode_reqs)

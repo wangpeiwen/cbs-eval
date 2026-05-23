@@ -258,12 +258,12 @@ def plot_sensitivity_trend(
 # ─────────────────────────────────────────────────────────
 
 def main():
-    qwen_sens = _load("results/qwen-2.5-7b-sensitivity.json")
-    llama_sens = _load("results/llama-3.1-8b-sensitivity.json")
-    qwen3_sens = _load("results/qwen3-14b-sensitivity.json")
-    qwen_ci = _load("results/qwen2.5-7B-ci.json")
-    llama_ci = _load("results/llama-3.1-8B-ci.json")
-    qwen_coloc = _load("results/qwen2.5-7b-colocation.json")
+    qwen_sens = _load("results/mlwd/qwen2.5-7b/sensitivity.json")
+    llama_sens = _load("results/mlwd/llama-3.1-8b/sensitivity.json")
+    qwen3_sens = _load("results/mlwd/qwen3-14b/sensitivity.json")
+    qwen_ci = _load("results/mlwd/qwen2.5-7b/ci.json")
+    llama_ci = _load("results/mlwd/llama-3.1-8b/ci.json")
+    qwen_coloc = _load("results/colocation/qwen2.5-7b.json")
 
     plot_sensitivity_heatmap(
         ("Qwen2.5-7B", qwen_sens),
@@ -284,7 +284,7 @@ def main():
 # ─────────────────────────────────────────────────────────
 
 def plot_alpha_prediction(
-    calibration_path: str = "results/combined-ols-calibration.json",
+    calibration_path: str = "results/calibration/combined-ols.json",
     output_path: str = "results/figures/fig_alpha_prediction.jpg",
 ):
     """Scatter: predicted α_d vs ground truth, two models in different colors."""
@@ -343,7 +343,7 @@ def plot_alpha_prediction(
 # ─────────────────────────────────────────────────────────
 
 def plot_weight_bar(
-    calibration_path: str = "results/combined-ols-calibration.json",
+    calibration_path: str = "results/calibration/combined-ols.json",
     output_path: str = "results/figures/fig_ols_weights.jpg",
 ):
     """Bar chart of Ridge regression coefficients, top-10 by absolute value."""

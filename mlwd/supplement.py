@@ -10,8 +10,8 @@
 Usage:
     CUDA_VISIBLE_DEVICES=0 python -m mlwd.supplement \
         --model qwen2.5-7b \
-        --input results/qwen2.5-7b-colocation.json \
-        --output results/qwen2.5-7b-colocation.json
+        --input results/colocation/qwen2.5-7b.json \
+        --output results/colocation/qwen2.5-7b.json
 """
 
 import argparse, json, os, time, gc

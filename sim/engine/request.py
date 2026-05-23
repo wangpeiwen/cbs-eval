@@ -60,6 +60,10 @@ class Request:
         self.chunk_id = None
         # CBS: track whether this request was colocated
         self.is_colocated: bool = False
+        self.arrival_time = None
+        self.prefill_end_time = None
+        self.first_token_time = None
+        self.finish_time = None
 
     @property
     def current_context_len(self):
@@ -74,6 +78,7 @@ class Request:
         return
 
     def init(self):
+        self.arrival_time = self.env.now
         self._log_event(E_INIT)
 
     def wait_prefill(self, wid=None):
@@ -107,6 +112,7 @@ class Request:
             return
 
         # All the prefills has been done.
+        self.prefill_end_time = self.env.now
         # Reset counter to 0
         # TODO: Should we do self.counter += 1?
         self.counter = 0
@@ -114,6 +120,8 @@ class Request:
         self.wait_decode(wid=next_wid)
         if not self.should_finish():
             return
+        self.first_token_time = self.env.now
+        self.finish_time = self.env.now
         self._log_event(E_EXIT_SYSTEM)
         self._terminated = True
         return
@@ -121,11 +129,26 @@ class Request:
     def finish_decode(self, is_finished_one_round=False, next_wid=None):
         if is_finished_one_round:
             self.counter += 1
+            if self.first_token_time is None:
+                self.first_token_time = self.env.now
         self.wait_decode(wid=next_wid)
         if self.should_finish():
+            self.finish_time = self.env.now
             self._log_event(E_EXIT_SYSTEM)
             self._terminated = True
         return
 
     def should_finish(self):
         return self.counter >= self.output_lens
+
+    @property
+    def id(self):
+        return self.req_id
+
+    @property
+    def input_length(self):
+        return self.prefill_lens
+
+    @property
+    def output_length(self):
+        return self.output_lens

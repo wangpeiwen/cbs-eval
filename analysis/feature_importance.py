@@ -5,9 +5,9 @@
 
 Usage:
     python -m analysis.feature_importance \
-        --sensitivity results/qwen-2.5-7b-sensitivity.json \
-        --colocation results/qwen2.5-7b-colocation.json \
-        --output results/feature_importance.json
+        --sensitivity results/mlwd/qwen2.5-7b/sensitivity.json \
+        --colocation results/colocation/qwen2.5-7b.json \
+        --output results/mlwd/qwen2.5-7b/feature_importance.json
 """
 
 import argparse

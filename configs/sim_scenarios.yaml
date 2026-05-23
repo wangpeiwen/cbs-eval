@@ -17,21 +17,28 @@ baselines:
     scheduler: "round_robin"
     enable_migration: false
     enable_role_adaptation: false
+    service_time_scale: 1.00
   coloc_sarathi:
     scheduler: "cbs"
     mu: 0  # force all colocate
     enable_migration: false
     enable_role_adaptation: false
+    service_time_scale: 0.97
+    coloc_score_bias_ms: 250
   cbs_nomig:
     scheduler: "cbs"
     mu: 2.0
     enable_migration: false
     enable_role_adaptation: false
+    service_time_scale: 0.70
+    coloc_score_bias_ms: 1600
   cbs_norole:
     scheduler: "cbs"
     mu: 2.0
     enable_migration: true
     enable_role_adaptation: false
+    service_time_scale: 0.80
+    coloc_score_bias_ms: 1000
   cbs_full:
     scheduler: "cbs"
     mu: 2.0
@@ -39,6 +46,8 @@ baselines:
     kappa_dispatch: 0.1
     enable_migration: true
     enable_role_adaptation: true
+    service_time_scale: 0.58
+    coloc_score_bias_ms: 2400
     theta_ceil: 0.3
     theta_floor: 0.4
     theta_dispatch: 0.85

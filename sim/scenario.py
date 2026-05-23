@@ -2,7 +2,6 @@
 
 import yaml
 import simpy
-from pathlib import Path
 from typing import Dict, Any, Tuple, List
 
 from workload.generator import WorkloadConfig, generate_workload, generate_arrivals
@@ -23,9 +22,8 @@ def build_scenario(
     """
     Build a SimPy environment and cluster from configuration.
 
-    Returns: (env, cluster, arrivals, requests)
+    Returns: (env, cluster, inter-arrivals in ms, requests)
     """
-    from sim.engine.params import DisaggRunParam, VLLMRunParam
     from sim.engine.request import Request as SimRequest
 
     scale = sim_config["scales"][scale_name]
@@ -37,68 +35,59 @@ def build_scenario(
 
     # Generate workload
     wl_requests = generate_workload(workload_cfg)
-    arrivals = generate_arrivals(wl_requests)
+    arrivals = [x * 1000.0 for x in generate_arrivals(wl_requests)]
+    env = simpy.Environment()
 
     # Convert to simulator request format
     sim_requests = []
     for r in wl_requests:
         sim_requests.append(SimRequest(
-            id=r.request_id,
-            input_length=r.input_len,
-            output_length=r.output_len,
+            env=env,
+            req_id=r.request_id,
+            prefill_length=r.input_len,
+            output_lens=r.output_len,
         ))
 
-    env = simpy.Environment()
-
     scheduler_type = baseline.get("scheduler", "round_robin")
+    worker_configs = {
+        "prefill_max_batch_size": sim_params.get("prefill_max_batch_size", 32),
+        "model_type": sim_params.get("model_type", "qwen2.5-7b"),
+        "TP_Prefill": 1,
+        "TP_Decode": 1,
+        "enable_chunked_prefill": True,
+        "prefill_max_tokens": sim_params.get("chunked_prefill_max_tokens", 512),
+        "service_time_scale": baseline.get("service_time_scale", 1.0),
+    }
 
     if scheduler_type == "round_robin" and not baseline.get("enable_migration", False):
         # Pure disaggregated baseline
         from sim.engine.disagg_cluster import DisaggCluster
-        from sim.engine.scheduler import Scheduler as RRScheduler
 
-        param = DisaggRunParam(
-            name=f"{scale_name}_{baseline_name}",
-            arrival=arrivals,
-            requests=sim_requests,
+        cluster = DisaggCluster(
+            env,
             N_prefill_instance=n_prefill,
             N_decode_instance=n_decode,
-            PP_prefill=1, PP_decode=1,
-            prefill_max_batch_size=sim_params.get("prefill_max_batch_size", 32),
-            model_type=sim_params.get("model_type", "qwen2.5-7b"),
-            TP_Prefill=1, TP_Decode=1,
-            chunked_prefill_max_tokens=sim_params.get("chunked_prefill_max_tokens", 512),
+            PP_prefill=1,
+            PP_decode=1,
+            worker_configs=worker_configs,
         )
-        cluster = DisaggCluster(env, param)
 
     elif scheduler_type == "cbs":
         # CBS-based scheduling (includes coloc_sarathi when mu=0)
         from sim.engine.cbs_cluster import CBSCluster
-        from sim.engine.interference_model import InterferenceModel
-
-        interference_model = InterferenceModel(
-            table_path=interference_table_path
-        ) if interference_table_path else InterferenceModel()
-
-        param = DisaggRunParam(
-            name=f"{scale_name}_{baseline_name}",
-            arrival=arrivals,
-            requests=sim_requests,
-            N_prefill_instance=n_prefill,
-            N_decode_instance=n_decode,
-            PP_prefill=1, PP_decode=1,
-            prefill_max_batch_size=sim_params.get("prefill_max_batch_size", 32),
-            model_type=sim_params.get("model_type", "qwen2.5-7b"),
-            TP_Prefill=1, TP_Decode=1,
-            chunked_prefill_max_tokens=sim_params.get("chunked_prefill_max_tokens", 512),
-        )
 
         cluster = CBSCluster(
-            env, param,
+            env,
+            N_prefill_instance=n_prefill,
+            N_decode_instance=n_decode,
+            PP_prefill=1,
+            PP_decode=1,
+            worker_configs=worker_configs,
             mu=baseline.get("mu", 2.0),
             lambda_ext=baseline.get("lambda_ext", 1.0),
             kappa_dispatch=baseline.get("kappa_dispatch", 0.1),
-            interference_model=interference_model,
+            coloc_score_bias=baseline.get("coloc_score_bias_ms", 0.0),
+            interference_table_path=interference_table_path,
             enable_migration=baseline.get("enable_migration", False),
             enable_role_adaptation=baseline.get("enable_role_adaptation", False),
             kv_transfer_latency=sim_params.get("kv_transfer_latency_ms", 5.0),
@@ -108,6 +97,8 @@ def build_scenario(
             theta_ceil=baseline.get("theta_ceil", 0.3),
             theta_floor=baseline.get("theta_floor", 0.4),
             theta_dispatch=baseline.get("theta_dispatch", 0.85),
+            max_migrations_per_scan=baseline.get("max_migrations_per_scan", 2),
+            migration_cooldown=baseline.get("migration_cooldown_s", 10) * 1000.0,
         )
     else:
         raise ValueError(f"Unknown scheduler type: {scheduler_type}")

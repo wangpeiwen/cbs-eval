@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 
 from sim.scenario import load_config, build_scenario
+from sim.engine.scheduler import put_requests_with_interarrivals
 from workload.generator import WorkloadConfig
 
 
@@ -20,10 +21,12 @@ def run_single(scale, baseline, sim_config, workload_cfg, interference_table, ou
     t0 = time.time()
 
     try:
+        cluster.run()
+        put_requests_with_interarrivals(env, cluster.scheduler, arrivals, requests)
         env.run()
     except Exception as e:
         print(f"  Simulation error: {e}")
-        return None
+        raise
 
     elapsed = time.time() - t0
     print(f"  Completed in {elapsed:.1f}s")
@@ -33,6 +36,8 @@ def run_single(scale, baseline, sim_config, workload_cfg, interference_table, ou
     results["meta"] = {
         "scale": scale,
         "baseline": baseline,
+        "workload": workload_cfg.arrival,
+        "rate": workload_cfg.rate,
         "num_requests": len(requests),
         "sim_elapsed_s": elapsed,
     }
@@ -50,19 +55,32 @@ def extract_results(cluster, requests):
     """Extract per-request metrics from completed simulation."""
     completed = []
     for req in requests:
+        arrival_ms = req.arrival_time
+        first_ms = req.first_token_time
+        end_ms = req.finish_time
+        completed_ok = end_ms is not None
+        ttft_ms = (first_ms - arrival_ms) if first_ms is not None and arrival_ms is not None else None
+        tpot_ms = None
+        if completed_ok and first_ms is not None:
+            if req.output_lens <= 1:
+                tpot_ms = 0.0
+            else:
+                tpot_ms = (end_ms - first_ms) / max(req.output_lens - 1, 1)
+
         entry = {
-            "request_id": req.id,
-            "input_len": req.input_length,
-            "output_len": req.output_length,
+            "request_id": req.req_id,
+            "input_len": req.prefill_lens,
+            "output_len": req.output_lens,
+            "arrival_ts": arrival_ms / 1000.0 if arrival_ms is not None else None,
+            "first_token_ts": first_ms / 1000.0 if first_ms is not None else None,
+            "end_ts": end_ms / 1000.0 if end_ms is not None else None,
+            "ttft_ms": ttft_ms,
+            "tpot_ms": tpot_ms,
+            "completed": completed_ok,
+            "mode": "colocate" if getattr(req, "is_colocated", False) else "disaggregate",
         }
-        if hasattr(req, "ttft"):
-            entry["ttft_ms"] = req.ttft
-        if hasattr(req, "tpot"):
-            entry["tpot_ms"] = req.tpot
-        if hasattr(req, "finish_time") and hasattr(req, "arrival_time"):
-            entry["total_latency_ms"] = req.finish_time - req.arrival_time
-        if hasattr(req, "mode"):
-            entry["mode"] = req.mode  # "colocate" or "disaggregate"
+        if completed_ok and arrival_ms is not None:
+            entry["total_latency_ms"] = end_ms - arrival_ms
         completed.append(entry)
     return {"requests": completed}
 

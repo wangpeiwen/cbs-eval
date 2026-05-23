@@ -13,7 +13,7 @@ plt.rcParams.update({
     "figure.dpi": 300,
 })
 
-data = json.load(open("results/combined-ols-calibration.json"))
+data = json.load(open("results/calibration/combined-ols.json"))
 combined = data["combined"]
 y_true = np.array(combined["y_true"])
 y_pred = np.array(combined["y_pred"])

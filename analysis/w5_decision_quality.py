@@ -9,11 +9,11 @@ Analyzes CBS decision logs to quantify:
 Usage:
     # First generate decision logs:
     python sim_paper.py --config 8node --models qwen2.5-7b --rates 12 \
-        --systems cbs_full --n-seeds 10 --save-decisions --output results/w5_raw.json
+        --systems cbs_full --n-seeds 10 --save-decisions --output results/analysis/w5_raw.json
 
     # Then analyze:
-    python -m analysis.w5_decision_quality results/w5_raw_decisions.json \
-        results/w5_raw.json --output results/w5_analysis.json
+    python -m analysis.w5_decision_quality results/analysis/w5_raw_decisions.json \
+        results/analysis/w5_raw.json --output results/analysis/w5_analysis.json
 """
 
 import argparse, json, sys
@@ -209,7 +209,7 @@ def main():
     parser.add_argument("decisions_json", help="Path to CBS decision log JSON")
     parser.add_argument("results_json", nargs="?", default=None,
                         help="Path to simulation results JSON (optional)")
-    parser.add_argument("--output", default="results/w5_analysis.json")
+    parser.add_argument("--output", default="results/analysis/w5_analysis.json")
     parser.add_argument("--slo-tpot", type=float, default=100.0)
     args = parser.parse_args()
 

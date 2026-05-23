@@ -101,7 +101,7 @@ def main():
     parser.add_argument("--n-seeds", type=int, default=10)
     parser.add_argument("--duration", type=float, default=600)
     parser.add_argument("--pattern", default="uniform")
-    parser.add_argument("--output", default="results/w2_jitter_sensitivity.json")
+    parser.add_argument("--output", default="results/analysis/w2_jitter_sensitivity.json")
     args = parser.parse_args()
 
     models = args.models.split(",")

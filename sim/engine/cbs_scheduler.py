@@ -36,6 +36,7 @@ class CBSScheduler(Scheduler):
         mu: float = 2.0,
         lambda_ext: float = 1.0,
         kappa_dispatch: float = 0.1,
+        coloc_score_bias: float = 0.0,
         interference_model: InterferenceModel = None,
         # Migration parameters
         enable_migration: bool = False,
@@ -61,6 +62,7 @@ class CBSScheduler(Scheduler):
         self.mu = mu
         self.lambda_ext = lambda_ext
         self.kappa_dispatch = kappa_dispatch
+        self.coloc_score_bias = coloc_score_bias
         self.interference_model = interference_model or InterferenceModel()
         # Migration config
         self.enable_migration = enable_migration
@@ -118,19 +120,22 @@ class CBSScheduler(Scheduler):
             if tokens_after > self.max_gpu_mem_tokens * (1 - self.rho_min):
                 continue
 
-            # B_token_max: compute budget check (chap4 eq 4.9)
-            iter_tokens = sum(1 for _ in d_worker.decode_queue) + req.prefill_lens
+            # B_token_max: use direct TPOT feasibility at chunked-prefill granularity.
             decode_bs = len(d_worker.decode_queue) + d_worker._decode_ips
             if decode_bs > 0 and self.slo_tpot > 0:
                 t_iter_0 = self._estimate_tpot(d_worker)
-                marginal = t_iter_0 / max(decode_bs, 1)
-                b_token_max = self.slo_tpot / max(marginal, 0.001) if marginal > 0 else float('inf')
-                if iter_tokens > b_token_max:
+                chunk_len = min(req.prefill_lens, getattr(d_worker, "prefill_max_tokens", req.prefill_lens))
+                alpha_d = self.interference_model.get_alpha_d(
+                    decode_bs=decode_bs,
+                    prefill_len=chunk_len,
+                    model_type=d_worker.model_type,
+                )
+                if t_iter_0 * (1 + alpha_d) > self.theta_dispatch * self.slo_tpot:
                     continue
 
             c_coloc = self._compute_coloc_cost(req, d_worker)
             risk = self._compute_risk(req, d_worker)
-            score = c_disagg - c_coloc - self.mu * risk
+            score = c_disagg - c_coloc - self.mu * risk + self.coloc_score_bias
             if score > best_score:
                 best_score = score
                 best_worker = d_worker
@@ -380,12 +385,11 @@ class CBSScheduler(Scheduler):
         decode_bs = len(worker.decode_queue) + worker._decode_ips
         if decode_bs == 0:
             return 0
-        avg_ctx = sum(r.current_context_len for r in worker.decode_queue) / max(len(worker.decode_queue), 1)
         t_step = get_decode_time(
             num_requests=decode_bs,
             pp=self.cluster.PP_decode,
             model_type=worker.model_type, TP=worker.TP_Decode,
-            token_generated_list=[int(avg_ctx)] * decode_bs,
+            token_generated_list=[512] * decode_bs,
             engine_type=worker.engine_type,
         )
         return t_step
@@ -425,12 +429,25 @@ class CBSScheduler(Scheduler):
         """
         now = self.env.now
 
-        # Collect candidates across all overloaded workers
+        # Collect candidates only for overloaded workers that have at least
+        # one safe destination. Under saturation this avoids scanning and
+        # sorting thousands of requests when no migration can be admitted.
         all_candidates = []
+        safe_targets = {}
         for src_worker in self._decode_heads:
             p_viol = self._violation_prob(src_worker)
             if p_viol <= self.theta_ceil:
                 continue
+            targets = []
+            for dst_worker in self._decode_heads:
+                if dst_worker is src_worker:
+                    continue
+                tpot_after = self._estimate_tpot_with_extra(dst_worker, 1)
+                if tpot_after <= self.theta_dispatch * self.slo_tpot:
+                    targets.append((dst_worker, tpot_after))
+            if not targets:
+                continue
+            safe_targets[src_worker] = targets
             for r in src_worker.decode_queue:
                 if self._cooldown_until.get(r.req_id, 0) <= now:
                     kv_size = r.current_context_len
@@ -451,13 +468,7 @@ class CBSScheduler(Scheduler):
             # Find target with max G_mig > 0
             best_dst = None
             best_g_mig = 0.0
-            for dst_worker in self._decode_heads:
-                if dst_worker is src_worker:
-                    continue
-                tpot_after = self._estimate_tpot_with_extra(dst_worker, 1)
-                if tpot_after > self.theta_dispatch * self.slo_tpot:
-                    continue
-
+            for dst_worker, tpot_after in safe_targets.get(src_worker, []):
                 # G_mig (chap4 eq 4.25)
                 o_remain = max(req.output_lens - max(0, req.counter), 1)
                 tpot_src_before = self._estimate_tpot(src_worker)
@@ -590,14 +601,11 @@ class CBSScheduler(Scheduler):
         decode_bs = len(worker.decode_queue) + worker._decode_ips + extra_reqs
         if decode_bs <= 0:
             return 0
-        avg_ctx = 512  # Rough estimate
-        if worker.decode_queue:
-            avg_ctx = sum(r.current_context_len for r in worker.decode_queue) / len(worker.decode_queue)
         return get_decode_time(
             num_requests=decode_bs,
             pp=self.cluster.PP_decode,
             model_type=worker.model_type, TP=worker.TP_Decode,
-            token_generated_list=[int(avg_ctx)] * decode_bs,
+            token_generated_list=[512] * decode_bs,
             engine_type=worker.engine_type,
         )
 

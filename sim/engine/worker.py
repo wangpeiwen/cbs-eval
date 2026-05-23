@@ -51,6 +51,7 @@ class Worker:
         decode_max_tokens=10 ** 7,
         decode_back_pressure: float = 0.9,
         engine_type: Literal["distserve", "vllm"] = "distserve",
+        service_time_scale: float = 1.0,
     ):
         self.env = env
         self.cluster = cluster  # Refer to the cluster of init.
@@ -91,6 +92,7 @@ class Worker:
         self.enable_chunked_prefill: bool = enable_chunked_prefill
         # Decode worker stop accepting incoming request when this is full.
         self.decode_back_pressure = decode_back_pressure
+        self.service_time_scale = service_time_scale
 
         self.prefill_queue: 'deque[Request]' = deque()
         self.decode_queue: 'deque[Request]' = deque()
@@ -323,6 +325,7 @@ class Worker:
         num_tokens = sum(x.current_context_len for x in (prefill_items + decode_reqs))
         if self.is_first_in_pipeline:
             delay += self.add_ray_overhead(num_tokens)
+        delay *= self.service_time_scale
         # Set the number of prefills in progress such that the scheduler get proper information about the worker.
         self._prefill_ips = len(prefill_items)
         yield self.env.timeout(delay)
@@ -346,6 +349,7 @@ class Worker:
         num_tokens = sum(x.current_context_len for x in decode_reqs)
         if self.is_first_in_pipeline:
             delay += self.add_ray_overhead(num_tokens)
+        delay *= self.service_time_scale
         yield self.env.timeout(delay)
         self._exit_decode(decode_reqs)
         return

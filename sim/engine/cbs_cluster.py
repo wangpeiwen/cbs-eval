@@ -31,13 +31,18 @@ class CBSCluster:
         mu: float = 2.0,
         lambda_ext: float = 1.0,
         kappa_dispatch: float = 0.1,
+        coloc_score_bias: float = 0.0,
         interference_table_path: str = None,
+        interference_model: InterferenceModel = None,
         # Migration parameters
         enable_migration: bool = False,
         enable_role_adaptation: bool = False,
-        migration_interval: float = 500.0,
+        migration_interval: float = 1000.0,
         theta_ceil: float = 0.3,
         theta_floor: float = 0.4,
+        theta_dispatch: float = 0.85,
+        max_migrations_per_scan: int = 2,
+        migration_cooldown: float = 10000.0,
         slo_tpot: float = 100.0,
         slo_ttft: float = 2000.0,
     ):
@@ -45,7 +50,8 @@ class CBSCluster:
         self.PP_prefill = PP_prefill
         self.PP_decode = PP_decode
 
-        interference_model = InterferenceModel(table_path=interference_table_path)
+        if interference_model is None:
+            interference_model = InterferenceModel(table_path=interference_table_path)
 
         worker_kwargs = dict(
             global_scheduler=None,
@@ -98,12 +104,16 @@ class CBSCluster:
             mu=mu,
             lambda_ext=lambda_ext,
             kappa_dispatch=kappa_dispatch,
+            coloc_score_bias=coloc_score_bias,
             interference_model=interference_model,
             enable_migration=enable_migration,
             enable_role_adaptation=enable_role_adaptation,
             migration_interval=migration_interval,
             theta_ceil=theta_ceil,
             theta_floor=theta_floor,
+            theta_dispatch=theta_dispatch,
+            max_migrations_per_scan=max_migrations_per_scan,
+            migration_cooldown=migration_cooldown,
             slo_tpot=slo_tpot,
             slo_ttft=slo_ttft,
         )

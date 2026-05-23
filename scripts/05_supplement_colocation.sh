@@ -19,7 +19,7 @@ echo ""
 
 CUDA_VISIBLE_DEVICES=0 python -m mlwd.supplement \
     --model qwen2.5-7b \
-    --input "${RESULTS}/qwen2.5-7b-colocation.json" \
+    --input "${RESULTS}/colocation/qwen2.5-7b.json" \
     --batch_sizes ${BATCH} --seq_lengths ${SEQ} \
     --num_runs 5 --warmup 2 --max_tokens 32 \
     2>&1 | tee "${RESULTS}/log_supplement_qwen25.txt" &
@@ -27,7 +27,7 @@ PID_Q25=$!
 
 CUDA_VISIBLE_DEVICES=1 python -m mlwd.supplement \
     --model llama-3.1-8b \
-    --input "${RESULTS}/llama-3.1-8b-colocation.json" \
+    --input "${RESULTS}/colocation/llama-3.1-8b.json" \
     --batch_sizes ${BATCH} --seq_lengths ${SEQ} \
     --num_runs 5 --warmup 2 --max_tokens 32 \
     2>&1 | tee "${RESULTS}/log_supplement_llama31.txt" &
@@ -44,7 +44,7 @@ echo ""
 
 CUDA_VISIBLE_DEVICES=0,1 python -m mlwd.supplement \
     --model qwen3-14b \
-    --input "${RESULTS}/qwen3-14b-colocation.json" \
+    --input "${RESULTS}/colocation/qwen3-14b.json" \
     --batch_sizes ${BATCH} --seq_lengths ${SEQ} \
     --num_runs 5 --warmup 2 --max_tokens 32 \
     --tp 2 \
@@ -58,9 +58,9 @@ echo "=== All supplement experiments complete ==="
 # ── 验证 ──
 python3 -c "
 import json
-for f in ['${RESULTS}/qwen2.5-7b-colocation.json',
-          '${RESULTS}/llama-3.1-8b-colocation.json',
-          '${RESULTS}/qwen3-14b-colocation.json']:
+for f in ['${RESULTS}/colocation/qwen2.5-7b.json',
+          '${RESULTS}/colocation/llama-3.1-8b.json',
+          '${RESULTS}/colocation/qwen3-14b.json']:
     d = json.load(open(f))
     pairs = d.get('pairs', [])
     n_ap = sum(1 for p in pairs if 'alpha_p' in p and p['alpha_p'] != 'N/A')

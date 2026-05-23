@@ -4,10 +4,10 @@
 
 Usage:
     python3 -m mlwd.merge_simple \
-        --sensitivity results/qwen-2.5-7b-sensitivity.json \
-        --ci results/qwen2.5-7B-ci.json \
+        --sensitivity results/mlwd/qwen2.5-7b/sensitivity.json \
+        --ci results/mlwd/qwen2.5-7b/ci.json \
         --model qwen2.5-7b \
-        --output results/qwen2.5-7b-mlwd_complete.json
+        --output results/mlwd/qwen2.5-7b/mlwd_complete.json
 """
 
 import argparse, json, os
